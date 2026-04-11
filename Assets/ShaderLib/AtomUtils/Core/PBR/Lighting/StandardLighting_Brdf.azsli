@@ -1,0 +1,50 @@
+
+// This is the "BRDF functions" portion of the engine's `StandardLighting.azsli` file, with the necessary includes, and renamed functions so that
+// they don't conflict with the macro names which can be used to override which lighting functions are used.
+//
+// Note: This code is duplicated from the engine and altered. Ideally, we should make a PR into the engine so we don't have to do this. [duplicate_code[engine]]
+
+#pragma once
+
+// Include options first
+#include <Atom/Features/PBR/LightingOptions.azsli>
+
+// Then include custom surface and lighting data types
+#include <Atom/Features/PBR/Lighting/LightingData.azsli>
+#include <Atom/Features/PBR/Surfaces/StandardSurface.azsli>
+
+#include <Atom/Features/PBR/Microfacet/Brdf.azsli>
+
+// Then define the Diffuse and Specular lighting functions
+
+real3 GetDiffuseLighting_StandardLighting(Surface surface, LightingData lightingData, real3 lightIntensity, real3 dirToLight)
+{
+    real3 diffuse = DiffuseLambertian(surface.albedo, surface.GetDiffuseNormal(), dirToLight, lightingData.diffuseResponse);
+
+#if ENABLE_CLEAR_COAT
+    if(o_clearCoat_feature_enabled)
+    {
+        // Attenuate diffuse term by clear coat's fresnel term to account for energy loss
+        real HdotV = saturate(dot(normalize(dirToLight + lightingData.dirToCamera[0]), lightingData.dirToCamera[0]));
+        diffuse *= 1.0 - (FresnelSchlick(HdotV, 0.04) * surface.clearCoat.factor);
+    }
+#endif
+
+    diffuse *= lightIntensity;
+    return diffuse;
+}
+
+real3 GetSpecularLighting_StandardLighting(Surface surface, LightingData lightingData, const real3 lightIntensity, const real3 dirToLight, uint viewIndex)
+{
+    real3 specular = SpecularGGX(lightingData.dirToCamera[viewIndex], dirToLight, surface.GetSpecularNormal(), surface.GetSpecularF0(), lightingData.GetSpecularNdotV(viewIndex), surface.roughnessA2, lightingData.multiScatterCompensation);
+
+#if ENABLE_CLEAR_COAT
+    if(o_clearCoat_feature_enabled)
+    {
+        specular = ClearCoatSpecular(dirToLight, lightingData.dirToCamera[viewIndex], surface.clearCoat.normal, surface.clearCoat.factor, surface.clearCoat.roughness, specular);
+    }
+#endif
+
+    specular *= lightIntensity;
+    return specular;
+}

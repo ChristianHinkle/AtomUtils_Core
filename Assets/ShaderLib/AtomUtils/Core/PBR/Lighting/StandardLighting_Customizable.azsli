@@ -1,0 +1,101 @@
+
+// [begin[modified_code[engine]]] Documentation.
+// This is a customizable version of the engine's `StandardLighting.azsli` file, which can have the lighting functions overriden by defining
+// the function-like macros `GetDiffuseLighting` and `GetSpecularLighting` before including us. Use `StandardLighting_Brdf.azsli` for the engine's
+// default implementations for standard lighting.
+//
+// Note: This code is duplicated from the engine and altered. Ideally, we should make a PR into the engine so we don't have to do this. [duplicate_code[engine]]
+// [end[modified_code[engine]]].
+
+#pragma once
+
+// [begin[modified_code[engine]]] Include the default BRDF definitions (which may be overriden).
+#include <AtomUtils/Core/PBR/Lighting/StandardLighting_Brdf.azsli>
+// [end[modified_code[engine]]]
+
+// [begin[modified_code[engine]]] Add overridable macros which allow redirecting to these lighting functions to make them customizeable. Note: Code
+// comment copied from BasePBR_LightingBrdf.azsli and StandardPBR_LightingBrdf.azsli files.
+// This #define magic lets you use the GetDiffuseLighting & GetSpecularLighting functions in this file without making them the final functions
+// used in your shader. Simply #define GetDiffuseLighting & GetSpecularLighting to your custom definition before including this file
+//
+#ifndef GetDiffuseLighting
+#define GetDiffuseLighting(surface, lightingData, lightIntensity, dirToLight) GetDiffuseLighting_StandardLighting(surface, lightingData, lightIntensity, dirToLight)
+#endif
+
+#ifndef GetSpecularLighting
+#define GetSpecularLighting(surface, lightingData, lightIntensity, dirToLight, viewIndex) GetSpecularLighting_StandardLighting(surface, lightingData, lightIntensity, dirToLight, viewIndex)
+#endif
+// [end[modified_code[engine]]]
+
+#define ENABLE_TRANSMISSION     0
+
+// Include options first
+#include <Atom/Features/PBR/LightingOptions.azsli>
+
+// Then include custom surface and lighting data types
+#include <Atom/Features/PBR/Lighting/LightingData.azsli>
+#include <Atom/Features/PBR/Surfaces/StandardSurface.azsli>
+
+#include <Atom/Features/PBR/LightingUtils.azsli>
+#include <Atom/Features/PBR/Microfacet/Brdf.azsli>
+
+
+#include <Atom/Features/SampleBrdfMap.azsli>
+#include <Atom/Features/GoboTexture.azsli>
+
+// Then include everything else
+#include <Atom/Features/PBR/Lights/Lights.azsli>
+
+struct PbrLightingOutput
+{
+    real4 m_diffuseColor;
+    real4 m_specularColor;
+    real4 m_albedo;
+    real4 m_specularF0;
+    real4 m_normal;
+};
+
+
+PbrLightingOutput GetPbrLightingOutput(Surface surface, LightingData lightingData, real alpha)
+{
+    PbrLightingOutput lightingOutput;
+
+    lightingOutput.m_diffuseColor = real4(lightingData.diffuseLighting, alpha);
+    lightingOutput.m_specularColor = real4(lightingData.specularLighting[0], 1.0);
+
+    // albedo, specularF0, roughness, and normals for later passes (specular IBL, Diffuse GI, SSR, AO, etc)
+    lightingOutput.m_specularF0 = real4(surface.GetSpecularF0(), surface.roughnessLinear);
+    lightingOutput.m_albedo.rgb = surface.albedo * lightingData.diffuseResponse * lightingData.diffuseAmbientOcclusion;
+    lightingOutput.m_albedo.a = lightingData.specularOcclusion;
+    lightingOutput.m_normal.rgb = EncodeNormalSignedOctahedron(surface.GetDefaultNormal());
+    lightingOutput.m_normal.a = EncodeUnorm2BitFlags(o_enableIBL, o_specularF0_enableMultiScatterCompensation);
+
+    return lightingOutput;
+}
+
+PbrLightingOutput DebugOutput(real3 color)
+{
+    PbrLightingOutput output = (PbrLightingOutput)0;
+
+    real3 defaultNormal = real3(0.0, 0.0, 1.0);
+
+    output.m_diffuseColor = real4(color.rgb, 1.0);
+    output.m_normal.rgb = EncodeNormalSignedOctahedron(defaultNormal);
+
+    return output;
+}
+
+// These functions are kept for compatabiltiy, the functionality now resides in Atom/Features/Pipeline/Forward/*.azsli
+
+#include <Atom/Features/Pipeline/Forward/ForwardPassDecals.azsli>
+#include <Atom/Features/Pipeline/Forward/ForwardPassDirectLighting.azsli>
+
+void ApplyDecals(inout LightCullingTileIterator tileIterator, inout Surface surface)
+{
+    ApplyDecals_ForwardPass(tileIterator, surface);
+}
+
+void ApplyDirectLighting(Surface surface, inout LightingData lightingData, float4 screenPosition, inout LightCullingTileIterator tileIterator)
+{
+    ApplyDirectLighting_ForwardPass(surface, lightingData, screenPosition, tileIterator);
+}

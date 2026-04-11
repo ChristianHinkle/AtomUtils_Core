@@ -1,0 +1,61 @@
+{
+    "description": "Example PBR material made with hand-written shaders instead of using a lighting model.",
+    "version": 1,
+    "propertyLayout": {
+        "groups": [
+            {
+                "id": "settings",
+                "displayName": "Settings"
+            }
+        ],
+        "properties": {
+            "settings": [
+                {
+                    "id": "baseColor",
+                    "displayName": "Base Color",
+                    "type": "Color",
+                    "defaultValue": [1.0, 1.0, 1.0],
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_baseColor"
+                    }
+                },
+                {
+                    "id": "metallic",
+                    "displayName": "Metallic",
+                    "type": "float",
+                    "defaultValue": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_metallic"
+                    }
+                },
+                {
+                    "id": "roughness",
+                    "displayName": "Roughness",
+                    "type": "float",
+                    "defaultValue": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_roughness"
+                    }
+                }
+            ]
+        }
+    },
+    "shaders": [
+        {
+            "file": "./ExampleMinimalPBR.shader"
+        },
+        {
+            "file": "Shaders/Depth/DepthPass.shader"
+        },
+        {
+            "file": "Shaders/Shadow/Shadowmap.shader"
+        }
+    ]
+}
